@@ -62,7 +62,7 @@ body {
     opacity: 0.2; cursor: not-allowed; pointer-events: none; filter: grayscale(1);
 }
 .select-card .avatar { font-size: 32px; margin-bottom: 12px; }
-.select-card .name { font-size: 12px; font-weight: 900; color: #aaa; letter-spacing: 1px; text-align: center; }
+.select-card .name { font-size: 13px; font-weight: 900; color: #aaa; letter-spacing: 1px; text-align: center; }
 .select-card .balance { font-size: 10px; color: #d4af37; margin-top: 8px; font-weight: 600; }
 .select-card.selected .name { color: #d4af37; }
 
