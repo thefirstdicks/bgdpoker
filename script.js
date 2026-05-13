@@ -1,189 +1,325 @@
-const PLAYER_NAMES = {
-    0: "한찬욱",
-    1: "이태현",
-    2: "조승훈",
-    3: "김명현",
-    4: "김규완"
-};
+/**
+ * BGD POKER CORE ENGINE v2.0
+ * 리팩터링 포인트: Single Source of Truth, UI-Logic 분리, 자동 저장
+ */
 
-const PLAYER_EMOJIS = {
-    0: "🧠",
-    1: "⚖️",
-    2: "🎩",
-    3: "💰",
-    4: "🃏"
-};
-
+// 1. 상수 및 초기 설정
 const STORAGE_KEY = 'bgd_poker_data';
-const BACKUP_KEY = 'bgd_poker_backup'; 
+const BACKUP_KEY = 'bgd_poker_backup';
 const SECRET_SALT = 'BGD_POKER_SECURE_KEY_2026';
 const ADMIN_PASSWORD = 'ggm';
-let START_CHIPS_DEFAULT = 10000000;
-let ANTE_AMOUNT = 50000;
-const RAKE_PERCENT = 0.05; 
+const ANTE_AMOUNT = 50000;
+const RAKE_PERCENT = 0.05;
 
-let allMemberBalances = {
-    0: START_CHIPS_DEFAULT,
-    1: START_CHIPS_DEFAULT,
-    2: START_CHIPS_DEFAULT,
-    3: START_CHIPS_DEFAULT,
-    4: START_CHIPS_DEFAULT
+// 2. 통합 게임 상태 (Single Source of Truth)
+const gameState = {
+    members: {
+        0: { id: 0, name: "한찬욱", emoji: "🧠", balance: 10000000 },
+        1: { id: 1, name: "이태현", emoji: "⚖️", balance: 10000000 },
+        2: { id: 2, name: "조승훈", emoji: "🎩", balance: 10000000 },
+        3: { id: 3, name: "김명현", emoji: "💰", balance: 10000000 },
+        4: { id: 4, name: "김규완", emoji: "🃏", balance: 10000000 }
+    },
+    table: [], // 현재 선택된 플레이어 3명 { memberId, currentBet, folded, allIn }
+    pot: 0,
+    phase: 2,
+    turn: 0,
+    callVal: 0,
+    actCount: 0,
+    firstPlayerIdx: -1,
+    isWinnerSelectionMode: false,
+
+    // [데이터 관리] 체크섬 생성
+    getChecksum(dataStr) {
+        let hash = 0;
+        const combined = dataStr + SECRET_SALT;
+        for (let i = 0; i < combined.length; i++) {
+            hash = ((hash << 5) - hash) + combined.charCodeAt(i);
+            hash |= 0;
+        }
+        return hash.toString();
+    },
+
+    // [데이터 관리] 저장
+    save() {
+        const balances = {};
+        Object.keys(this.members).forEach(id => balances[id] = this.members[id].balance);
+        const dataStr = JSON.stringify(balances);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ balances, checksum: this.getChecksum(dataStr) }));
+        localStorage.setItem(BACKUP_KEY, dataStr);
+    },
+
+    // [데이터 관리] 불러오기
+    load() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return;
+        try {
+            const { balances, checksum } = JSON.parse(saved);
+            if (checksum === this.getChecksum(JSON.stringify(balances))) {
+                Object.keys(balances).forEach(id => this.members[id].balance = balances[id]);
+            } else {
+                alert("⚠️ 데이터 조작 감지! 백업 데이터 사용.");
+                const backup = JSON.parse(localStorage.getItem(BACKUP_KEY));
+                if (backup) Object.keys(backup).forEach(id => this.members[id].balance = backup[id]);
+            }
+        } catch (e) { console.error("Load Error", e); }
+    }
 };
 
-function generateChecksum(dataStr) {
-    let hash = 0;
-    const combined = dataStr + SECRET_SALT;
-    for (let i = 0; i < combined.length; i++) {
-        const char = combined.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
+// 3. UI 매핑 객체 (캐싱)
+const DOM = {
+    home: document.getElementById('home-screen'),
+    pot: document.getElementById('pot-display'),
+    rake: document.getElementById('rake-display'),
+    controls: document.getElementById('button-group'),
+    nextAction: document.getElementById('next-container'),
+    btnNext: document.getElementById('btn-main-next'),
+    rankLayer: document.getElementById('rank-layer'),
+    players: [0, 1, 2].map(i => ({
+        node: document.getElementById(`p${i}-node`),
+        chips: document.getElementById(`p${i}-chips`),
+        name: document.getElementById(`p${i}-name`),
+        avatar: document.getElementById(`p${i}-avatar`),
+        tag: document.querySelector(`#p${i}-node .status-tag`)
+    })),
+    amounts: {
+        call: document.getElementById('call-amt'),
+        qtr: document.getElementById('quarter-amt'),
+        half: document.getElementById('half-amt')
     }
-    return hash.toString();
-}
+};
 
-function loadBalances() {
-    const savedRaw = localStorage.getItem(STORAGE_KEY);
-    const backupRaw = localStorage.getItem(BACKUP_KEY);
-
-    if (savedRaw) {
-        try {
-            const parsed = JSON.parse(savedRaw);
-            const dataStr = JSON.stringify(parsed.balances);
-            
-            if (parsed.checksum === generateChecksum(dataStr)) {
-                allMemberBalances = parsed.balances;
-            } else {
-                alert("⚠️ 데이터 조작 감지! 백업 데이터로 복원합니다.");
-                if (backupRaw) {
-                    allMemberBalances = JSON.parse(backupRaw);
-                    saveBalances(); 
-                } else {
-                    saveBalances();
-                }
-            }
-        } catch (e) {
-            saveBalances();
-        }
-    }
+// 4. 핵심 렌더링 엔진 (데이터를 UI에 동기화)
+function render(prevPot = gameState.pot) {
+    if (prevPot !== gameState.pot) animateValue(DOM.pot, prevPot, gameState.pot, 800);
     
-    for (let i = 0; i <= 4; i++) {
-        const balSpan = document.getElementById(`bal-${i}`);
-        if(balSpan) balSpan.innerText = (allMemberBalances[i] || 0).toLocaleString();
+    if (gameState.isWinnerSelectionMode) return;
+
+    gameState.table.forEach((p, i) => {
+        const member = gameState.members[p.memberId];
+        const ui = DOM.players[i];
         
-        const nameDiv = document.getElementById(`lobby-name-${i}`);
-        if(nameDiv) nameDiv.innerText = PLAYER_NAMES[i];
+        ui.chips.innerText = member.balance.toLocaleString();
+        ui.node.classList.toggle('active', i === gameState.turn);
+        ui.node.classList.toggle('all-in', p.allIn);
+        ui.node.style.opacity = p.folded ? "0.05" : (i === gameState.turn ? "1" : "0.3");
+    });
 
-        const avatarDiv = document.getElementById(`lobby-avatar-${i}`);
-        if(avatarDiv) avatarDiv.innerText = PLAYER_EMOJIS[i];
-        
-        const card = document.getElementById(`card-${i}`);
-        if(card) {
-            if ((allMemberBalances[i] || 0) < ANTE_AMOUNT) {
-                card.classList.add('disabled');
-            } else {
-                card.classList.remove('disabled');
-            }
-        }
-    }
+    // 배팅 금액 텍스트 업데이트
+    const curP = gameState.table[gameState.turn];
+    const member = gameState.members[curP.memberId];
+    const diff = gameState.callVal - curP.currentBet;
+
+    DOM.amounts.call.innerText = diff > member.balance ? `ALL-IN (${member.balance.toLocaleString()})` : `-${diff.toLocaleString()}`;
+    DOM.amounts.qtr.innerText = `+${Math.floor(gameState.pot / 4).toLocaleString()}`;
+    DOM.amounts.half.innerText = `+${Math.floor(gameState.pot / 2).toLocaleString()}`;
+
+    // 버튼 활성 상태 제어
+    const canAct = !curP.allIn && !curP.folded;
+    document.getElementById('btn-check').disabled = !canAct || diff > 0 || (gameState.phase === 2 && gameState.actCount === 0);
+    document.getElementById('btn-call').disabled = !canAct || diff === 0;
+    ['btn-quarter', 'btn-half', 'btn-die'].forEach(id => document.getElementById(id).disabled = !canAct);
 }
 
-function saveBalances() {
-    if (selectedPlayers.length > 0 && players[0].chips !== undefined) {
-        selectedPlayers.forEach((p, i) => {
-            allMemberBalances[p.id] = players[i].chips;
-        });
-    }
-    const dataStr = JSON.stringify(allMemberBalances);
-    const payload = {
-        balances: allMemberBalances,
-        checksum: generateChecksum(dataStr)
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    localStorage.setItem(BACKUP_KEY, dataStr); 
-}
-
-function resetAllData() {
-    const inputPw = prompt("ADMIN PASSWORD:");
-    if (inputPw === ADMIN_PASSWORD) {
-        if(confirm("모든 잔액을 초기화하시겠습니까?")) {
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(BACKUP_KEY);
-            location.reload();
-        }
-    } else if (inputPw !== null) {
-        alert("WRONG PASSWORD.");
-    }
-}
-
-let selectedPlayers = [];
-
+// 5. 게임 로직 함수들
 function selectMember(id) {
-    if (allMemberBalances[id] < ANTE_AMOUNT) return;
+    const member = gameState.members[id];
+    if (member.balance < ANTE_AMOUNT) return;
 
     const card = document.getElementById(`card-${id}`);
-    if (card.classList.contains('selected')) {
-        card.classList.remove('selected');
-        selectedPlayers = selectedPlayers.filter(p => p.id !== id);
-    } else {
-        if (selectedPlayers.length < 3) {
-            card.classList.add('selected');
-            selectedPlayers.push({id, avatar: PLAYER_EMOJIS[id], name: PLAYER_NAMES[id], chips: allMemberBalances[id]});
+    const isSelected = card.classList.toggle('selected');
+
+    if (isSelected) {
+        if (gameState.table.length >= 3) {
+            card.classList.remove('selected');
+            return;
         }
-    }
-    const startBtn = document.getElementById('start-btn-lobby');
-    if (selectedPlayers.length === 3) {
-        startBtn.classList.add('active');
+        gameState.table.push({ memberId: id, currentBet: 0, folded: false, allIn: false });
     } else {
-        startBtn.classList.remove('active');
+        gameState.table = gameState.table.filter(p => p.memberId !== id);
     }
+    
+    document.getElementById('start-btn-lobby').classList.toggle('active', gameState.table.length === 3);
 }
 
 function startGame() {
-    if (selectedPlayers.length !== 3) return;
-    selectedPlayers.forEach((p, i) => {
-        document.getElementById(`p${i}-avatar`).innerHTML = `${p.avatar}<div class="turn-indicator"></div>`;
-        document.getElementById(`p${i}-name`).innerText = p.name;
-        players[i].chips = p.chips;
+    if (gameState.table.length !== 3) return;
+    
+    gameState.table.forEach((p, i) => {
+        const m = gameState.members[p.memberId];
+        DOM.players[i].avatar.innerHTML = `${m.emoji}<div class="turn-indicator"></div>`;
+        DOM.players[i].name.innerText = m.name;
     });
-    const home = document.getElementById('home-screen');
-    home.style.transition = 'opacity 0.5s ease';
-    home.style.opacity = '0';
+
+    DOM.home.style.opacity = '0';
+    setTimeout(() => { DOM.home.style.display = 'none'; resetGame(); }, 500);
+}
+
+function handleBet(type) {
+    const p = gameState.table[gameState.turn];
+    const member = gameState.members[p.memberId];
+    let prevPot = gameState.pot;
+    let betAmt = 0;
+
+    // 배팅액 계산
+    if (type === 'half' || type === 'quarter') {
+        const ratio = type === 'half' ? 2 : 4;
+        const raise = Math.floor(gameState.pot / ratio);
+        betAmt = Math.min(member.balance, (gameState.callVal - p.currentBet) + raise);
+        
+        // 피드백 (진동/화면 흔들기)
+        const dur = type === 'half' ? 270 : 150;
+        document.body.style.animation = `shake ${dur/1000}s ease-in-out`;
+        setTimeout(() => document.body.style.animation = "", dur);
+        if (navigator.vibrate) navigator.vibrate(type === 'half' ? 60 : 15);
+    } 
+    else if (type === 'call') betAmt = Math.min(member.balance, gameState.callVal - p.currentBet);
+    else if (type === 'die') p.folded = true;
+
+    // 잔액 차감 및 상태 반영
+    if (betAmt > 0) {
+        member.balance -= betAmt;
+        p.currentBet += betAmt;
+        gameState.pot += betAmt;
+        if (p.currentBet > gameState.callVal) gameState.callVal = p.currentBet;
+        if (member.balance === 0) p.allIn = true;
+    }
+
+    gameState.actCount++;
+    gameState.save();
+
+    // 승부/턴 종료 체크
+    const survivors = gameState.table.filter(tp => !tp.folded);
+    if (survivors.length === 1) {
+        gameState.isWinnerSelectionMode = true;
+        render(prevPot);
+        startWinnerSelection(gameState.table.indexOf(survivors[0]));
+        return;
+    }
+
+    const canAct = survivors.filter(tp => !tp.allIn);
+    const isRoundEnd = (survivors.every(tp => tp.currentBet === gameState.callVal || tp.allIn) && gameState.actCount >= survivors.length) || canAct.length <= 1;
+
+    if (isRoundEnd) {
+        endRound(canAct.length <= 1 || survivors.every(tp => tp.allIn));
+    } else {
+        do { gameState.turn = (gameState.turn + 1) % 3; } 
+        while (gameState.table[gameState.turn].folded || gameState.table[gameState.turn].allIn);
+        render(prevPot);
+    }
+}
+
+function endRound(isShowdown) {
+    DOM.controls.style.opacity = '0';
     setTimeout(() => {
-        home.style.display = 'none';
-        resetGame();
+        DOM.controls.style.display = 'none';
+        DOM.nextAction.style.display = 'flex';
+        document.getElementById('btn-lobby').style.display = 'none';
+        
+        if (gameState.phase >= 5 || isShowdown) {
+            DOM.btnNext.innerText = "SHOWDOWN";
+            DOM.btnNext.onclick = () => startWinnerSelection();
+        } else {
+            DOM.btnNext.innerText = "CONTINUE";
+            DOM.btnNext.onclick = () => nextPhase();
+        }
     }, 500);
+    render(gameState.pot);
 }
 
-function returnToLobby() {
-    location.reload();
+function startWinnerSelection(autoIdx = null) {
+    gameState.isWinnerSelectionMode = true;
+    DOM.nextAction.style.display = 'none';
+    DOM.controls.style.display = 'none';
+
+    gameState.table.forEach((p, i) => {
+        DOM.players[i].node.classList.remove('active');
+        if (!p.folded) {
+            DOM.players[i].node.style.opacity = "0.3";
+            DOM.players[i].node.classList.add('selectable');
+        }
+    });
+
+    if (autoIdx !== null) setTimeout(() => handleWinnerSelection(autoIdx, true), 300);
 }
 
-let players = [
-    {chips: 0, bet: 0, totalBet: 0, folded: false, allIn: false}, 
-    {chips: 0, bet: 0, totalBet: 0, folded: false, allIn: false}, 
-    {chips: 0, bet: 0, totalBet: 0, folded: false, allIn: false}
-];
-let phase, pot, turn, callVal, actCount, isWinnerSelectionMode = false;
-let firstPlayer = -1; 
+function handleWinnerSelection(idx, force = false) {
+    if ((!gameState.isWinnerSelectionMode && !force) || (gameState.table[idx].folded && !force)) return;
 
-const UI = {
-    pot: document.getElementById('pot-display'),
-    rake: document.getElementById('rake-display'),
-    group: document.getElementById('button-group'),
-    container: document.getElementById('next-container'),
-    btnNext: document.getElementById('btn-main-next'),
-    callAmt: document.getElementById('call-amt'),
-    qtrAmt: document.getElementById('quarter-amt'),
-    halfAmt: document.getElementById('half-amt'),
-    rankLayer: document.getElementById('rank-layer')
-};
+    let prevPot = gameState.pot;
+    let rake = Math.floor((gameState.pot * RAKE_PERCENT) / 1000) * 1000;
+    let netGain = gameState.pot - rake;
 
-function toggleRank(show) {
-    UI.rankLayer.style.display = show ? 'flex' : 'none';
+    DOM.rake.innerText = `RAKE: -${rake.toLocaleString()} (5%)`;
+    DOM.rake.classList.add('visible');
+
+    gameState.members[gameState.table[idx].memberId].balance += netGain;
+    gameState.pot = 0;
+    gameState.isWinnerSelectionMode = false;
+
+    gameState.save();
+    animateValue(DOM.pot, prevPot, 0, 800);
+
+    DOM.players.forEach((ui, i) => {
+        ui.node.classList.remove('selectable', 'active');
+        ui.node.style.opacity = (i === idx) ? "1" : "0.05";
+        if (i === idx) ui.node.classList.add('active');
+    });
+
+    setTimeout(() => {
+        DOM.nextAction.style.display = 'flex';
+        document.getElementById('btn-lobby').style.display = 'block';
+        DOM.btnNext.innerText = "NEW GAME";
+        DOM.btnNext.onclick = () => resetGame();
+    }, 850);
 }
 
-function animateValue(id, start, end, duration) {
-    const obj = (typeof id === 'string') ? document.getElementById(id) : id;
+function resetGame() {
+    gameState.phase = 2; gameState.pot = 0; gameState.callVal = 0; gameState.actCount = 0;
+    gameState.isWinnerSelectionMode = false;
+    gameState.firstPlayerIdx = (gameState.firstPlayerIdx + 1) % 3;
+    DOM.rake.classList.remove('visible');
+
+    gameState.table.forEach((p, i) => {
+        const member = gameState.members[p.memberId];
+        p.currentBet = 0; p.folded = false;
+        
+        let ante = Math.min(member.balance, ANTE_AMOUNT);
+        member.balance -= ante;
+        p.currentBet = ante;
+        gameState.pot += ante;
+        p.allIn = (member.balance === 0);
+        
+        DOM.players[i].node.classList.remove('active', 'selectable', 'all-in');
+    });
+
+    gameState.turn = gameState.firstPlayerIdx;
+    while(gameState.table[gameState.turn].allIn) gameState.turn = (gameState.turn + 1) % 3;
+
+    gameState.save();
+    DOM.nextAction.style.display = 'none';
+    DOM.controls.style.display = 'grid';
+    DOM.controls.style.opacity = '1';
+    render(0);
+}
+
+function nextPhase() {
+    gameState.phase++; gameState.actCount = 0; gameState.callVal = 0;
+    gameState.table.forEach(p => p.currentBet = 0);
+    
+    gameState.turn = gameState.firstPlayerIdx;
+    while(gameState.table[gameState.turn].folded || gameState.table[gameState.turn].allIn) {
+        gameState.turn = (gameState.turn + 1) % 3;
+    }
+
+    DOM.controls.style.display = 'grid';
+    setTimeout(() => DOM.controls.style.opacity = '1', 10);
+    DOM.nextAction.style.display = 'none';
+    render();
+}
+
+// 헬퍼: 애니메이션 숫자
+function animateValue(obj, start, end, duration) {
     let startTimestamp = null;
     const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
@@ -194,203 +330,20 @@ function animateValue(id, start, end, duration) {
     window.requestAnimationFrame(step);
 }
 
-function updateUI(prevPot, isTurnEnd = false) {
-    animateValue(UI.pot, prevPot, pot, 1000);
-    if (isWinnerSelectionMode) return;
-
-    let p = players[turn];
-    let diff = callVal - p.bet;
-    
-    UI.callAmt.innerText = diff > p.chips ? `ALL-IN (${p.chips.toLocaleString()})` : `-${diff.toLocaleString()}`;
-    UI.qtrAmt.innerText = `+${Math.floor(pot / 4).toLocaleString()}`;
-    UI.halfAmt.innerText = `+${Math.floor(pot / 2).toLocaleString()}`;
-
-    players.forEach((p, i) => {
-        const node = document.getElementById(`p${i}-node`);
-        document.getElementById(`p${i}-chips`).innerText = p.chips.toLocaleString();
-        
-        if (isTurnEnd) {
-            node.classList.remove('active');
-            node.style.opacity = p.folded ? "0.05" : "1.0"; 
-        } else {
-            node.classList.toggle('active', i === turn);
-            node.classList.toggle('all-in', p.allIn);
-            node.style.opacity = p.folded ? "0.05" : (i === turn ? "1" : "0.3");
-        }
-    });
-
-    if (!isTurnEnd) {
-        const needCall = callVal > p.bet;
-        document.getElementById('btn-check').disabled = (phase === 2 && actCount === 0) || needCall || p.allIn;
-        document.getElementById('btn-call').disabled = !needCall || p.allIn;
-        document.getElementById('btn-quarter').disabled = p.allIn;
-        document.getElementById('btn-half').disabled = p.allIn;
-        document.getElementById('btn-die').disabled = p.allIn;
-    } else {
-        UI.group.querySelectorAll('button').forEach(btn => btn.disabled = true);
+// 헬퍼: 데이터 초기화
+function resetAllData() {
+    if (prompt("ADMIN PASSWORD:") === ADMIN_PASSWORD && confirm("모든 잔액을 초기화하시겠습니까?")) {
+        localStorage.clear(); location.reload();
     }
 }
 
-function handleBet(type) {
-    let p = players[turn];
-    let prevPot = pot;
-    let actualBet = 0;
+function toggleRank(show) { DOM.rankLayer.style.display = show ? 'flex' : 'none'; }
 
-    if (type === 'half' || type === 'quarter') {
-        const shakeDuration = (type === 'half') ? 0.27 : 0.15;
-        document.body.style.animation = `shake ${shakeDuration}s ease-in-out`;
-        setTimeout(() => document.body.style.animation = "", shakeDuration * 1000);
-        if (navigator.vibrate) navigator.vibrate((type === 'half') ? [60] : [15]);
-        let diff = callVal - p.bet;
-        actualBet = Math.min(p.chips, diff + Math.floor(pot / (type === 'half' ? 2 : 4)));
-    } else if (type === 'call') {
-        actualBet = Math.min(p.chips, callVal - p.bet);
-    } else if (type === 'die') {
-        p.folded = true;
-    }
-
-    if (actualBet > 0) {
-        p.chips -= actualBet; p.bet += actualBet; p.totalBet += actualBet; pot += actualBet;
-        if (p.chips === 0) p.allIn = true;
-        if (p.bet > callVal) callVal = p.bet;
-    }
-    
-    actCount++;
-    const survivors = players.filter(pl => !pl.folded);
-    const canAct = survivors.filter(pl => !pl.allIn);
-
-    if (survivors.length === 1) { 
-        isWinnerSelectionMode = true;
-        updateUI(prevPot, true);
-        startWinnerSelection(players.indexOf(survivors[0])); 
-        return; 
-    }
-
-    let isTurnEnd = false;
-    if ((survivors.every(pl => pl.bet === callVal || pl.allIn) && actCount >= survivors.length) || canAct.length <= 1) {
-        isTurnEnd = true;
-        UI.group.style.opacity = '0';
-        setTimeout(() => {
-            UI.group.style.display = 'none';
-            UI.container.style.display = 'flex';
-            document.getElementById('btn-lobby').style.display = 'none';
-            if (phase >= 5 || survivors.every(pl => pl.allIn) || canAct.length <= 1) {
-                UI.btnNext.innerText = "SHOWDOWN";
-                UI.btnNext.onclick = () => startWinnerSelection(); 
-            } else {
-                UI.btnNext.innerText = "CONTINUE";
-                UI.btnNext.onclick = () => nextPhase();
-            }
-        }, 500);
-    } else {
-        do { turn = (turn + 1) % 3; } while (players[turn].folded || players[turn].allIn);
-    }
-    updateUI(prevPot, isTurnEnd);
+// 초기화 실행
+gameState.load();
+// 로비 화면 초기 잔액 표시
+for(let i=0; i<=4; i++) {
+    document.getElementById(`bal-${i}`).innerText = gameState.members[i].balance.toLocaleString();
+    document.getElementById(`lobby-name-${i}`).innerText = gameState.members[i].name;
+    document.getElementById(`lobby-avatar-${i}`).innerText = gameState.members[i].emoji;
 }
-
-function startWinnerSelection(autoWinnerIdx = null) {
-    isWinnerSelectionMode = true;
-    UI.container.style.display = 'none';
-    UI.group.style.display = 'none';
-    
-    setTimeout(() => {
-        players.forEach((p, i) => {
-            const node = document.getElementById(`p${i}-node`);
-            node.classList.remove('active');
-            if (!p.folded) {
-                node.style.opacity = "0.3"; node.classList.add('selectable');
-            } else {
-                node.style.opacity = "0.05"; node.classList.remove('selectable');
-            }
-        });
-        if (autoWinnerIdx !== null) setTimeout(() => handleWinnerSelection(autoWinnerIdx, true), 300);
-    }, 50);
-}
-
-function handleWinnerSelection(idx, force = false) {
-    if ((!isWinnerSelectionMode && !force) || (players[idx].folded && !force)) return;
-
-    let prevPot = pot;
-    let rawRake = pot * RAKE_PERCENT;
-    let rake = Math.floor(rawRake / 1000) * 1000; 
-    let winnerNetGain = pot - rake;
-
-    UI.rake.innerText = `RAKE: -${rake.toLocaleString()} (5%)`;
-    UI.rake.classList.add('visible');
-
-    players[idx].chips += winnerNetGain;
-    pot = 0;
-    isWinnerSelectionMode = false;
-
-    players.forEach((_, i) => {
-        const node = document.getElementById(`p${i}-node`);
-        node.classList.remove('selectable', 'active');
-        if (i === idx) {
-            node.style.opacity = "1"; node.classList.add('active'); 
-        } else {
-            node.style.opacity = "0.05";
-        }
-    });
-
-    animateValue(UI.pot, prevPot, 0, 800);
-    saveBalances();
-
-    setTimeout(() => {
-        document.getElementById(`p${idx}-chips`).innerText = players[idx].chips.toLocaleString();
-        UI.container.style.display = 'flex';
-        document.getElementById('btn-lobby').style.display = 'block';
-        UI.btnNext.innerText = "NEW GAME";
-        UI.btnNext.onclick = () => resetGame();
-    }, 850);
-}
-
-function resetGame() {
-    phase = 2; pot = 0; callVal = 0; actCount = 0;
-    isWinnerSelectionMode = false;
-    firstPlayer = (firstPlayer + 1) % 3;
-    
-    UI.rake.classList.remove('visible');
-    
-    let startIdx = firstPlayer;
-    while (players[startIdx].chips < ANTE_AMOUNT && players.some(pl => pl.chips >= ANTE_AMOUNT)) {
-        startIdx = (startIdx + 1) % 3;
-    }
-    turn = startIdx;
-
-    players.forEach((p, i) => {
-        p.bet = 0; p.totalBet = 0; p.folded = false;
-        p.allIn = (p.chips <= 0);
-        const node = document.getElementById(`p${i}-node`);
-        node.classList.remove('active', 'selectable', 'all-in');
-        node.style.opacity = "0.3";
-        if (p.chips > 0) {
-            let actualAnte = Math.min(p.chips, ANTE_AMOUNT);
-            p.chips -= actualAnte; p.totalBet = actualAnte; pot += actualAnte;
-            if(p.chips === 0) p.allIn = true;
-        }
-        document.getElementById(`p${i}-chips`).innerText = p.chips.toLocaleString();
-    });
-
-    saveBalances();
-    UI.container.style.display = 'none';
-    UI.group.style.display = 'grid';
-    UI.group.style.opacity = '1';
-    updateUI(0);
-}
-
-function nextPhase() {
-    phase++; actCount = 0; callVal = 0;
-    players.forEach(p => p.bet = 0);
-    let startIdx = firstPlayer;
-    while (players[startIdx].folded || players[startIdx].allIn) {
-        startIdx = (startIdx + 1) % 3;
-    }
-    turn = startIdx;
-    UI.group.style.display = 'grid';
-    setTimeout(() => UI.group.style.opacity = '1', 10);
-    UI.container.style.display = 'none';
-    updateUI(pot, false); 
-}
-
-// 초기 실행
-loadBalances();
