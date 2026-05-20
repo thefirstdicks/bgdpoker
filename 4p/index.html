@@ -618,10 +618,10 @@ function processTurn() {
     if (callCost === 0) {
         btnCall.innerText = `체크(0칩)`;
     } else {
-        btnCall.innerText = `콜(${callCost.toLocaleString()}칩)`;
+        btnCall.innerText = `콜(-${callCost.toLocaleString()}칩)`;
     }
-    btnQuarter.innerText = `쿼터(+${quarterCost.toLocaleString()}칩)`;
-    btnHalf.innerText = `하프(+${halfCost.toLocaleString()}칩)`;
+    btnQuarter.innerText = `쿼터(-${quarterCost.toLocaleString()}칩)`;
+    btnHalf.innerText = `하프(-${halfCost.toLocaleString()}칩)`;
 
     if (currentRound === 1 && roundActionCount === 0 && currentTurnIndex === 0) {
         btnCall.disabled = true;
@@ -632,7 +632,7 @@ function processTurn() {
     } else {
         if (currentRound === 1 && callCost === 0) {
             btnCall.disabled = true;
-            btnCall.innerText = "체크 불가[1R]";
+            btnCall.innerText = "체크 불가 [1R]";
         }
         if (currentMaxBet === 0) {
             btnCall.disabled = true; 
