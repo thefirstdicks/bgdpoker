@@ -310,7 +310,7 @@
             <!-- JS로 프로필 6개 생성 -->
         </div>
         
-        <button id="start-game-btn" class="btn-block" style="background: linear-gradient(135deg, #ffe680, #fbbf24); color: #02040a; font-size: 17px; margin-top: 24px; box-shadow: 0 8px 30px rgba(251, 191, 36, 0.4);" disabled onclick="initGameWindow()">게임 시작</button>
+        <button id="start-game-btn" class="btn-block" style="background: linear-gradient(135deg, #ffe680, #fbbf24); color: #02040a; font-size: 17px; margin-top: 24px; box-shadow: 0 8px 30px rgba(251, 191, 36, 0.4);" disabled onclick="initGameWindow()">게임 시작(1인당 -50칩)</button>
         
         <div class="admin-section">
             <h4>[관리자 전용]</h4>
@@ -335,7 +335,7 @@
                     <div class="pot-box-title">TOTAL POT</div>
                     <div class="pot-main-amount"><span id="pot-display">0</span><span style="font-size:24px; font-weight:900; color:#475569; font-family:sans-serif;">칩</span></div>
                     <div style="font-size:14px; color: var(--text-light-muted); font-weight:normal; margin-top: 12px;">
-                        현재 기준 실수령액: <span id="net-pot-display" style="color:#f8fafc; font-weight:900;">0</span>칩 / 
+                        현 시점 기준 실수령액: <span id="net-pot-display" style="color:#f8fafc; font-weight:900;">0</span>칩 / 
                         수수료(5%): <span id="rake-display" style="color:#64748b; font-weight:700;">0</span>칩
                     </div>
                 </div>
@@ -356,14 +356,14 @@
                 <!-- 1. 제일 상단: 상시 오픈형 족보 판정 가이드 -->
                 <div id="genealogy-guide" class="genealogy-box">
                     <strong style="color:var(--text-color); display:block; margin-bottom:10px; font-size:15.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom:8px;">BGD POKER 족보</strong>
-                    1 | 5-스트레이트<br>
-                    2 | 1 페어 & 3-스트레이트<br>
-                    3 | 홀/짝<br>
-                    4 | 4-스트레이트<br>
-                    5 | 2 페어<br>
-                    6 | 3-스트레이트<br>
-                    7 | 1 페어<br>
-                    8 | 하이 타일
+                    1위 | 5-스트레이트<br>
+                    2위 | 1 페어 & 3-스트레이트<br>
+                    3위 | 홀/짝<br>
+                    4위 | 4-스트레이트<br>
+                    5위 | 2 페어<br>
+                    6위 | 3-스트레이트<br>
+                    7위 | 1 페어<br>
+                    8위 | 하이 타일
                 </div>
 
                 <!-- 2. 아래: 베팅 버튼 액션 패널 -->
@@ -615,7 +615,7 @@ function processTurn() {
     }
 
     let p = gamePlayers[currentTurnIndex];
-    document.getElementById("action-title").innerText = `▶ [${p.name}]님의 차례`;
+    document.getElementById("action-title").innerText = `▶ ${p.name} 님의 차례`;
 
     let callCost = currentMaxBet - p.betInThisRound;
     let quarterCost = (currentMaxBet - p.betInThisRound) + Math.floor(pot / 4);
@@ -716,7 +716,7 @@ function nextRoundFlow() {
         nextBtn.innerText = `${currentRound + 1}라운드 진행`;
     } else {
         document.getElementById("action-title").innerText = `📢 최종 라운드 베팅 종료`;
-        nextBtn.innerText = `쇼다운(결산) 진행`;
+        nextBtn.innerText = `SHOWDOWN 진행`;
     }
 }
 
@@ -750,7 +750,7 @@ function updateGameUI() {
             <div class="${stateClass}">
                 <div style="font-weight:800; font-size:15px; margin-bottom:6px; color:${isCurrent ? 'var(--neon-green)' : 'var(--text-color)'}">${p.name}</div>
                 <div style="font-size:13px; color:var(--text-light-muted);">보유: <span style="color:#f8fafc; font-weight:700;">${p.chips.toLocaleString()}</span>칩</div>
-                <div style="font-size:12px; color: var(--text-light-muted); margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.04); font-family:monospace;">이번R 베팅: ${p.betInThisRound.toLocaleString()}</div>
+                <div style="font-size:12px; color: var(--text-light-muted); margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.04); font-family:monospace;">이번 라운드 베팅: ${p.betInThisRound.toLocaleString()}</div>
             </div>
         `;
     });
