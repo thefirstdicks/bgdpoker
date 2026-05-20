@@ -391,7 +391,7 @@
     <!-- ========================================== -->
     <div id="showdown-screen" class="hidden">
         <h2>SHOWDOWN</h2>
-        <p style="text-align:center; color: var(--text-light-muted); font-size: 14.5px; margin-bottom: 30px;">이번 게임의 최종 승자를 선택해주세요.</p>
+        <p style="text-align:center; color: var(--text-light-muted); font-size: 14.5px; margin-bottom: 30px;">이번 게임의 승자를 선택해주세요.</p>
         
         <div class="pot-box" style="border-color: var(--neon-green); background: linear-gradient(180deg, #02120e 0%, #052219 100%); margin-bottom: 28px;">
             <div class="pot-box-title" style="color: var(--neon-green); font-weight:900;">실수령액</div>
@@ -425,7 +425,17 @@
 const STARTING_CHIP = 10000;
 const ANTE = 50;
 const RAKE_RATE = 0.05;
-const ADMIN_PW = "1234"; 
+const ADMIN_PW = "ggm"; 
+
+// 플레이어 기본 정보 상수로 완전 고정 (이름은 로컬 스토리지에 넣지 않음)
+const BASE_PROFILES = [
+    { id: "P1", name: "한찬욱" },
+    { id: "P2", name: "이태현" },
+    { id: "P3", name: "김규완" },
+    { id: "P4", name: "조승훈" },
+    { id: "P5", name: "김명현" },
+    { id: "P6", name: "안용신" }
+];
 
 let allProfiles = [];
 let selectedIds = [];       
@@ -438,40 +448,46 @@ let lastRaiserIndex = -1;
 let roundActionCount = 0;  
 
 // ==========================================
-// 기존 핵심 기능 함수 체계 (수정 없이 완전 유지)
+// 기존 핵심 기능 함수 체계 (수정 없이 완전 유지하되, 로컬스토리지는 칩 점수만 동기화하도록 간소화)
 // ==========================================
 function initLoad() {
-    let saved = localStorage.getItem("BGD_PROFILES_V2");
-    if (saved) {
-        allProfiles = JSON.parse(saved);
-    } else {
-        allProfiles = [
-            { id: "P1", name: "한찬욱", chips: STARTING_CHIP },
-            { id: "P2", name: "이태현", chips: STARTING_CHIP },
-            { id: "P3", name: "김규완", chips: STARTING_CHIP },
-            { id: "P4", name: "조승훈", chips: STARTING_CHIP },
-            { id: "P5", name: "김명현", chips: STARTING_CHIP },
-            { id: "P6", name: "안용신", chips: STARTING_CHIP }
-        ];
-        saveToStorage();
-    }
+    // 로컬 스토리지에서는 각 유저 ID별 칩 점수 맵만 관리함
+    let savedChips = localStorage.getItem("BGD_CHIPS_MAP_V3");
+    let chipsMap = savedChips ? JSON.parse(savedChips) : {};
+
+    // 고정된 BASE_PROFILES 구조를 바탕으로 실시간 데이터 결합
+    allProfiles = BASE_PROFILES.map(p => {
+        return {
+            id: p.id,
+            name: p.name,
+            chips: chipsMap[p.id] !== undefined ? chipsMap[p.id] : STARTING_CHIP
+        };
+    });
+    
+    saveToStorage();
     renderLobby();
 }
 
 function saveToStorage() {
-    localStorage.setItem("BGD_PROFILES_V2", JSON.stringify(allProfiles));
+    // 로컬 스토리지 데이터 오염 방지를 위해 오직 { ID: 칩수 } 쌍만 미니멀하게 저장
+    let chipsMap = {};
+    allProfiles.forEach(p => {
+        chipsMap[p.id] = p.chips;
+    });
+    localStorage.setItem("BGD_CHIPS_MAP_V3", JSON.stringify(chipsMap));
 }
 
 function resetAllChips() {
     let pw = document.getElementById("admin-password").value;
     if (pw === ADMIN_PW) {
+        // 하드코딩된 이름 기반으로 자산만 초기화하므로 이름 오염 원천 차단
         allProfiles.forEach(p => p.chips = STARTING_CHIP);
         saveToStorage();
         selectedIds = [];
         document.getElementById("admin-password").value = "";
         renderLobby();
         document.getElementById("start-game-btn").disabled = true;
-        alert("모든 프로필 자산이 초기 상태(10,000)로 리셋되었습니다.");
+        alert("모든 플레이어의 자산이 10,000칩으로 초기화되었습니다.");
     } else {
         alert("비밀번호가 올바르지 않습니다.");
     }
