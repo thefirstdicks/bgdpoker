@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BGD POKER - 4P</title>
+    <style>
+        :root {
+            --bg-color: #02040a;
+            --container-bg: rgba(8, 12, 24, 0.9);
+            --card-bg: rgba(15, 23, 42, 0.6);
+            --card-active: rgba(22, 38, 70, 0.95);
+            --text-color: #f8fafc;
+            --text-muted: #475569;
+            --text-light-muted: #94a3b8;
+            --accent-color: #fbbf24;
+            --accent-glow: rgba(251, 191, 36, 0.35);
+            --primary-btn: linear-gradient(135deg, #059669 0%, #046345 100%);
+            --raise-btn: linear-gradient(135deg, #ea580c 0%, #9a3412 100%);
+            --half-btn: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            --fold-btn: linear-gradient(135deg, #4b5563 0%, #1f2937 100%);
+            --disabled-btn: #0f172a;
+            --disabled-text: #334155;
+            --neon-green: #10b981;
+            --neon-green-glow: rgba(16, 185, 129, 0.4);
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Malgun Gothic", sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 40%),
+                radial-gradient(at 100% 100%, rgba(251, 191, 36, 0.04) 0px, transparent 40%);
+            background-attachment: fixed;
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            letter-spacing: -0.5px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .container {
+            width: 100%;
+            max-width: 1024px;
+            background: var(--container-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 40px 30px;
+            border-radius: 40px;
+            box-shadow: 
+                0 40px 80px -15px rgba(0, 0, 0, 0.95),
+                inset 0 1px 0px rgba(255, 255, 255, 0.1);
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            transition: max-width 0.3s ease;
+        }
+        h1, h2, h3, h4 { text-align: center; margin-top: 0; font-weight: 900; }
+        h1 { font-size: 36px; background: linear-gradient(180deg, #ffffff 40%, #cbd5e1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; letter-spacing: 2px; }
+        .hidden { display: none !important; }
+        
+        /* 하이브리드 미디어 분할 메인 그리드 */
+        .game-grid-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+        
+        /* 로비 무대 스킨 디자인 */
+        .lobby-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin: 32px 0;
+        }
+        @media (min-width: 768px) {
+            .lobby-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .profile-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            padding: 26px 20px;
+            border-radius: 24px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .profile-card:hover { transform: translateY(-3px); border-color: rgba(255, 255, 255, 0.08); box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6); }
+        .profile-card.selected {
+            border-color: var(--accent-color);
+            background: var(--card-active);
+            box-shadow: 0 0 30px var(--accent-glow), inset 0 0 20px rgba(251, 191, 36, 0.15);
+        }
+        .profile-card .order-badge {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: linear-gradient(135deg, #fffbeb 0%, #fbbf24 100%);
+            color: #02040a;
+            font-weight: 900;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.7);
+            animation: bounce-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border: 3px solid #080c18;
+        }
+        @keyframes bounce-in { 0% { transform: scale(0); } 100% { transform: scale(1); } }
+        
+        .admin-section {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 26px;
+            border-radius: 26px;
+            margin-top: 48px;
+            border: 1px solid rgba(255, 255, 255, 0.01);
+            box-shadow: inset 0 4px 16px rgba(0,0,0,0.8);
+            text-align: center;
+        }
+        .admin-section h4 { color: var(--text-light-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 2.5px; margin-bottom: 18px; font-weight: 800; }
+
+        /* 디지털 스코어보드 특수 하이라이트 */
+        .pot-box {
+            background: linear-gradient(180deg, #010307 0%, #060b15 100%);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 28px;
+            border-radius: 28px;
+            text-align: center;
+            margin-bottom: 0px;
+            box-shadow: inset 0 4px 30px rgba(0,0,0,0.95), 0 15px 45px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+        .pot-box::before {
+            content: ''; position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+        }
+        .pot-box-title { font-size: 14px; color: var(--text-light-muted); font-weight: 800; letter-spacing: 3px; margin-bottom: 12px; }
+        .pot-main-amount { color: var(--accent-color); font-size: 46px; font-weight: 900; font-family: 'SF Mono', SFMono-Regular, Consolas, monospace; text-shadow: 0 0 30px rgba(251, 191, 36, 0.45); }
+        
+        .round-info {
+            background: rgba(10, 16, 30, 0.85);
+            padding: 22px;
+            border-radius: 24px;
+            text-align: center;
+            margin-bottom: 0px;
+            color: #f1f5f9;
+            font-size: 14.5px;
+            line-height: 1.65;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        /* 인게임 실시간 플레이어 매트릭스 */
+        .player-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 0px;
+        }
+        .player-box {
+            background: var(--card-bg);
+            padding: 24px 22px;
+            border-radius: 26px;
+            border: 1px solid rgba(255, 255, 255, 0.02);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
+        }
+        .player-box.active { 
+            border-color: var(--neon-green); 
+            background: var(--card-active);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 0 35px var(--neon-green-glow), 0 20px 40px rgba(0, 0, 0, 0.6);
+            animation: pulse-border-glow 2s infinite ease-in-out;
+        }
+        @keyframes pulse-border-glow {
+            0%, 100% { border-color: rgba(16, 185, 129, 0.3); box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), 0 20px 40px rgba(0, 0, 0, 0.6); }
+            50% { border-color: rgba(16, 185, 129, 1); box-shadow: 0 0 40px rgba(16, 185, 129, 0.5), 0 20px 40px rgba(0, 0, 0, 0.6); }
+        }
+        .player-box.folded { opacity: 0.15; filter: grayscale(1) brightness(0.5); transform: scale(0.96); box-shadow: none; }
+        
+        /* 제어 사운드 대시보드 */
+        .action-panel {
+            background: linear-gradient(135deg, #060b16 0%, #0e172a 100%);
+            padding: 26px;
+            border-radius: 28px;
+            margin-bottom: 0px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            box-shadow: 0 30px 50px rgba(0, 0, 0, 0.6);
+        }
+        
+        /* 시네마틱 액션 버튼 메커니즘 */
+        button {
+            padding: 19px;
+            border: none;
+            border-radius: 20px;
+            font-size: 16.5px;
+            font-weight: 900;
+            cursor: pointer;
+            transition: all 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+            color: white;
+            letter-spacing: -0.2px;
+        }
+        button:active:not(:disabled) { transform: scale(0.96); filter: brightness(0.9); }
+        button:disabled {
+            background: var(--disabled-btn) !important;
+            color: var(--disabled-text) !important;
+            cursor: not-allowed;
+            box-shadow: none !important;
+            transform: none !important;
+            opacity: 0.15;
+            border: 1px solid rgba(255, 255, 255, 0.002) !important;
+        }
+        .btn-block { width: 100%; display: block; margin-bottom: 16px; box-sizing: border-box; }
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        .btn-call { background: var(--primary-btn); box-shadow: 0 8px 24px rgba(5, 150, 105, 0.3); }
+        .btn-quarter { background: var(--raise-btn); box-shadow: 0 8px 24px rgba(234, 88, 12, 0.3); }
+        .btn-half { background: var(--half-btn); box-shadow: 0 8px 24px rgba(220, 38, 38, 0.3); }
+        .btn-fold { background: var(--fold-btn); box-shadow: 0 8px 20px rgba(75, 85, 99, 0.2); }
+        
+        /* 가이드라인 레이어 */
+        .genealogy-box {
+            background: #010307;
+            padding: 26px;
+            border-radius: 22px;
+            margin-top: 0px;
+            font-size: 14px;
+            line-height: 1.85;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            color: #94a3b8;
+            box-shadow: inset 0 4px 16px rgba(0,0,0,0.8);
+        }
+        
+        /* 결산 라운드 스킨 */
+        .winner-select-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 36px;
+        }
+        .winner-btn {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            text-align: left;
+            padding: 26px;
+            border-radius: 22px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        .winner-btn:hover { border-color: var(--accent-color); background: var(--card-active); box-shadow: 0 0 25px rgba(251, 191, 36, 0.2); }
+        
+        /* 마이크로 패스워드 인풋 컴포넌트 */
+        input[type="password"] {
+            padding: 18px;
+            background: #010307;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: white;
+            border-radius: 16px;
+            margin-bottom: 18px;
+            box-sizing: border-box;
+            font-size: 14px;
+            text-align: center;
+            transition: all 0.2s ease;
+            width: 85%;
+            max-width: 250px;
+        }
+        input[type="password"]:focus { border-color: var(--accent-color); outline: none; background: #050912; box-shadow: 0 0 16px rgba(251, 191, 36, 0.2); }
+
+        /* 와이드 레이아웃 대응 미디어 쿼리 정의 */
+        @media (min-width: 840px) {
+            .game-grid-layout {
+                grid-template-columns: 1.1fr 0.9fr;
+                align-items: start;
+            }
+            .layout-left-col {
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            }
+            .layout-right-col {
+                display: flex;
+                flex-direction: column;
+                gap: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- ========================================== -->
+    <!-- 1. 로비 화면 -->
+    <!-- ========================================== -->
+    <div id="lobby-screen">
+        <h1>BGD POKER LOBBY</h1>
+        <p style="text-align:center; color: var(--text-light-muted); font-size:14.5px; margin-bottom: 36px;">플레이어를 턴 순서대로 4명 선택하세요.</p>
+        
+        <div class="lobby-grid" id="profile-container">
+            <!-- JS로 프로필 6개 생성 -->
+        </div>
+        
+        <button id="start-game-btn" class="btn-block" style="background: linear-gradient(135deg, #ffe680, #fbbf24); color: #02040a; font-size: 17px; margin-top: 24px; box-shadow: 0 8px 30px rgba(251, 191, 36, 0.4);" disabled onclick="initGameWindow()">게임 시작</button>
+        
+        <div class="admin-section">
+            <h4>[관리자 전용]</h4>
+            <input type="password" id="admin-password" placeholder="비밀번호 입력"><br>
+            <button onclick="resetAllChips()" style="background:#1e293b; color:#f8fafc; padding:14px 30px; font-size:13.5px; border-radius: 16px; font-weight:800; border:1px solid rgba(255,255,255,0.03);">전체 초기화</button>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 2. 게임 안 테이블 화면 -->
+    <!-- ========================================== -->
+    <div id="game-screen" class="hidden">
+        <h2 style="margin-bottom: 24px; font-size: 28px; color:#f8fafc; letter-spacing: 0.5px;">BGD POKER TABLE</h2>
+        
+        <!-- 요청사항 맞춤형 2열 분할 레이아웃 -->
+        <div class="game-grid-layout">
+            
+            <!-- [좌측 영역] -->
+            <div class="layout-left-col">
+                <!-- 1. 제일 상단: 판돈 표시 칸 -->
+                <div class="pot-box">
+                    <div class="pot-box-title">TOTAL POT</div>
+                    <div class="pot-main-amount"><span id="pot-display">0</span><span style="font-size:24px; font-weight:900; color:#475569; font-family:sans-serif;">칩</span></div>
+                    <div style="font-size:14px; color: var(--text-light-muted); font-weight:normal; margin-top: 12px;">
+                        현재 기준 실수령액: <span id="net-pot-display" style="color:#f8fafc; font-weight:900;">0</span>칩 / 
+                        수수료(5%): <span id="rake-display" style="color:#64748b; font-weight:700;">0</span>칩
+                    </div>
+                </div>
+
+                <!-- 2. 아래: 현재 라운드 정보 및 행동 칸 -->
+                <div class="round-info" id="round-rules-display">
+                    <!-- 라운드별 카드 가이드 텍스트 자동 대입 -->
+                </div>
+
+                <!-- 3. 아래: 플레이어 4명 현황 칸 -->
+                <div class="player-list" id="table-players-container">
+                    <!-- 게임 참여중인 4인 현황 -->
+                </div>
+            </div>
+            
+            <!-- [우측 영역] -->
+            <div class="layout-right-col">
+                <!-- 1. 제일 상단: 상시 오픈형 족보 판정 가이드 -->
+                <div id="genealogy-guide" class="genealogy-box">
+                    <strong style="color:var(--text-color); display:block; margin-bottom:10px; font-size:15.5px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom:8px;">BGD POKER 족보</strong>
+                    1. 5-스트레이트<br>
+                    2. 1페어 + 3-스트레이트<br>
+                    3. 홀/짝<br>
+                    4. 4-스트레이트<br>
+                    5. 2 페어<br>
+                    6. 3-스트레이트<br>
+                    7. 1 페어<br>
+                    8. 하이 타일
+                </div>
+
+                <!-- 2. 아래: 베팅 버튼 액션 패널 -->
+                <div class="action-panel">
+                    <h4 id="action-title" style="margin-bottom:22px; text-align:left; color: var(--accent-color); font-size: 16.5px; font-weight: 900; letter-spacing: -0.2px;">[플레이어]님의 턴</h4>
+                    <!-- 기존 4버튼 감싸는 컨테이너 -->
+                    <div id="normal-action-buttons" class="btn-grid">
+                        <button id="act-call" class="btn-call" onclick="executeAction('call')">체크 / 콜</button>
+                        <button id="act-quarter" class="btn-quarter" onclick="executeAction('quarter')">쿼터</button>
+                        <button id="act-half" class="btn-half" onclick="executeAction('half')">하프</button>
+                        <button id="act-fold" class="btn-fold" onclick="executeAction('fold')">폴드</button>
+                    </div>
+                    <!-- 다음 라운드 진행 전용 전체 크기 버튼 (기본 숨김) -->
+                    <div id="next-round-panel" class="hidden">
+                        <button id="next-round-big-btn" class="btn-block" style="background: linear-gradient(135deg, #fbbf24, #d97706); color: #02040a; font-size: 17px; box-shadow: 0 8px 24px rgba(251, 191, 36, 0.35); margin-bottom: 0;" onclick="commitNextRoundFlow()"></button>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 3. 쇼다운 및 승자 선택 화면 -->
+    <!-- ========================================== -->
+    <div id="showdown-screen" class="hidden">
+        <h2>SHOWDOWN</h2>
+        <p style="text-align:center; color: var(--text-light-muted); font-size: 14.5px; margin-bottom: 30px;">이번 게임의 최종 승자를 선택해주세요.</p>
+        
+        <div class="pot-box" style="border-color: var(--neon-green); background: linear-gradient(180deg, #02120e 0%, #052219 100%); margin-bottom: 28px;">
+            <div class="pot-box-title" style="color: var(--neon-green); font-weight:900;">실수령액</div>
+            <div class="pot-main-amount" style="color: var(--neon-green);"><span id="sd-net-pot">0</span><span style="font-size:24px; font-weight:900; color:#475569; font-family:sans-serif;">칩</span></div>
+            <div style="font-size:14px; color: var(--text-light-muted); font-weight:normal; margin-top: 12px;">공제된 수수료 (5%): <span id="sd-rake-pot" style="color:var(--text-color); font-weight:600;">0</span>칩</div>
+        </div>
+
+        <div class="winner-select-list" id="winner-buttons-container">
+            <!-- 살아남은 플레이어 전용 승자 지정 버튼 생성 -->
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- 4. 라운드 종료 / 정산 완료 화면 -->
+    <!-- ========================================== -->
+    <div id="result-screen" class="hidden">
+        <h2>게임 종료</h2>
+        <div id="result-summary-text" style="background: var(--card-bg); padding:36px; border-radius:28px; text-align:center; margin: 36px 0; font-size:19px; line-height: 1.75; border: 1px solid rgba(255,255,255,0.03); box-shadow: inset 0 2px 16px rgba(0,0,0,0.6);">
+            <!-- 우승 내역 출력 -->
+        </div>
+        
+        <button class="btn-block" style="background: linear-gradient(135deg, #ffe680, #fbbf24); color: #02040a; padding:20px; font-size: 17px; font-weight: 900; box-shadow: 0 8px 30px rgba(251, 191, 36, 0.35);" onclick="actionNewGame()">새 게임</button>
+        <button class="btn-block" style="background:#1e293b; color:white; padding:16px; font-size: 14.5px; border:1px solid rgba(255,255,255,0.02);" onclick="actionBackToLobby()">로비로 돌아가기</button>
+    </div>
+</div>
+
+<script>
+// ==========================================
+// 시스템 환경 변수 및 확정 수식 밸런스 설정 (기존 로직 완벽 고수)
+// ==========================================
+const STARTING_CHIP = 10000;
+const ANTE = 50;
+const RAKE_RATE = 0.05;
+const ADMIN_PW = "1234"; 
+
+let allProfiles = [];
+let selectedIds = [];       
+let gamePlayers = [];      
+let currentRound = 1;      
+let currentTurnIndex = 0;  
+let pot = 0;               
+let currentMaxBet = 0;     
+let lastRaiserIndex = -1;  
+let roundActionCount = 0;  
+
+// ==========================================
+// 기존 핵심 기능 함수 체계 (수정 없이 완전 유지)
+// ==========================================
+function initLoad() {
+    let saved = localStorage.getItem("BGD_PROFILES_V2");
+    if (saved) {
+        allProfiles = JSON.parse(saved);
+    } else {
+        allProfiles = [
+            { id: "P1", name: "프로필 A", chips: STARTING_CHIP },
+            { id: "P2", name: "프로필 B", chips: STARTING_CHIP },
+            { id: "P3", name: "프로필 C", chips: STARTING_CHIP },
+            { id: "P4", name: "프로필 D", chips: STARTING_CHIP },
+            { id: "P5", name: "프로필 E", chips: STARTING_CHIP },
+            { id: "P6", name: "프로필 F", chips: STARTING_CHIP }
+        ];
+        saveToStorage();
+    }
+    renderLobby();
+}
+
+function saveToStorage() {
+    localStorage.setItem("BGD_PROFILES_V2", JSON.stringify(allProfiles));
+}
+
+function resetAllChips() {
+    let pw = document.getElementById("admin-password").value;
+    if (pw === ADMIN_PW) {
+        allProfiles.forEach(p => p.chips = STARTING_CHIP);
+        saveToStorage();
+        selectedIds = [];
+        document.getElementById("admin-password").value = "";
+        renderLobby();
+        document.getElementById("start-game-btn").disabled = true;
+        alert("모든 프로필 자산이 초기 상태(10,000)로 리셋되었습니다.");
+    } else {
+        alert("비밀번호가 올바르지 않습니다.");
+    }
+}
+
+function renderLobby() {
+    const container = document.getElementById("profile-container");
+    container.innerHTML = "";
+    
+    allProfiles.forEach(p => {
+        let isSel = selectedIds.includes(p.id);
+        let orderIdx = selectedIds.indexOf(p.id);
+        
+        let card = document.createElement("div");
+        card.className = `profile-card ${isSel ? 'selected' : ''}`;
+        card.onclick = () => toggleProfileSelection(p.id);
+        
+        let badge = isSel ? `<div class="order-badge">${orderIdx + 1}</div>` : '';
+        
+        card.innerHTML = `
+            ${badge}
+            <div style="font-weight:800; font-size:16px; margin-bottom:8px; color:var(--text-color);">${p.name}</div>
+            <div style="color:var(--accent-color); font-size:14px; font-weight:700;">${p.chips.toLocaleString()}칩</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function toggleProfileSelection(id) {
+    let index = selectedIds.indexOf(id);
+    if (index > -1) {
+        selectedIds.splice(index, 1);
+    } else {
+        if (selectedIds.length < 4) {
+            selectedIds.push(id);
+        }
+    }
+    
+    renderLobby();
+    document.getElementById("start-game-btn").disabled = (selectedIds.length !== 4);
+}
+
+function initGameWindow() {
+    gamePlayers = selectedIds.map(id => {
+        let core = allProfiles.find(p => p.id === id);
+        return {
+            id: core.id,
+            name: core.name,
+            chips: core.chips,
+            betInThisRound: 0, 
+            isFolded: false
+        };
+    });
+
+    document.getElementById("lobby-screen").classList.add("hidden");
+    document.getElementById("game-screen").classList.remove("hidden");
+    
+    setupHand();
+}
+
+function setupHand() {
+    currentRound = 1;
+    pot = 0;
+    
+    gamePlayers.forEach(p => {
+        p.isFolded = false;
+        p.betInThisRound = 0;
+        p.chips -= ANTE;
+        pot += ANTE;
+    });
+    
+    startRound(1);
+}
+
+function startRound(roundNum) {
+    currentRound = roundNum;
+    currentMaxBet = 0;
+    roundActionCount = 0;
+    lastRaiserIndex = -1;
+    
+    gamePlayers.forEach(p => p.betInThisRound = 0);
+    
+    const ruleBox = document.getElementById("round-rules-display");
+    if (currentRound === 1 || currentRound === 2) {
+        ruleBox.innerHTML = `<strong>[현재 라운드: ${currentRound}라운드]</strong><br>각 자리에 타일 2장을 가져가고, 1장을 오픈합니다.`;
+    } else {
+        ruleBox.innerHTML = `<strong>[현재 라운드: ${currentRound}라운드]</strong><br>각 자리에 타일 1장을 추가로 가져가며, 오픈하지 않습니다 (히든).`;
+    }
+
+    // 새 라운드가 돌면 대기 패널을 숨기고 일반 버튼 활성화
+    document.getElementById("next-round-panel").classList.add("hidden");
+    document.getElementById("normal-action-buttons").classList.remove("hidden");
+
+    if (currentRound === 1) {
+        currentTurnIndex = 0; 
+    } else {
+        currentTurnIndex = gamePlayers.findIndex(p => !p.isFolded);
+    }
+
+    processTurn();
+}
+
+function processTurn() {
+    updateGameUI();
+
+    let activeCount = gamePlayers.filter(p => !p.isFolded).length;
+    if (activeCount === 1) {
+        autoWinByFold();
+        return;
+    }
+
+    if (roundActionCount >= gamePlayers.length) {
+        let livePlayers = gamePlayers.filter(p => !p.isFolded);
+        let cleanRound = livePlayers.every(p => p.betInThisRound === currentMaxBet);
+        if (cleanRound) {
+            nextRoundFlow();
+            return;
+        }
+    }
+
+    if (gamePlayers[currentTurnIndex].isFolded) {
+        currentTurnIndex = (currentTurnIndex + 1) % 4;
+        processTurn();
+        return;
+    }
+
+    let p = gamePlayers[currentTurnIndex];
+    document.getElementById("action-title").innerText = `▶ [${p.name}]님의 베팅 차례`;
+
+    let callCost = currentMaxBet - p.betInThisRound;
+    let quarterCost = (currentMaxBet - p.betInThisRound) + Math.floor(pot / 4);
+    let halfCost = (currentMaxBet - p.betInThisRound) + Math.floor(pot / 2);
+
+    const btnCall = document.getElementById("act-call");
+    const btnQuarter = document.getElementById("act-quarter");
+    const btnHalf = document.getElementById("act-half");
+    const btnFold = document.getElementById("act-fold");
+
+    btnCall.disabled = false;
+    btnQuarter.disabled = false;
+    btnHalf.disabled = false;
+    btnFold.disabled = false;
+
+    if (callCost === 0) {
+        btnCall.innerText = `체크 (0칩)`;
+    } else {
+        btnCall.innerText = `콜 (${callCost.toLocaleString()}칩)`;
+    }
+    btnQuarter.innerText = `쿼터 (+${quarterCost.toLocaleString()}칩)`;
+    btnHalf.innerText = `하프 (+${halfCost.toLocaleString()}칩)`;
+
+    if (currentRound === 1 && roundActionCount === 0 && currentTurnIndex === 0) {
+        btnCall.disabled = true;
+        btnQuarter.disabled = true;
+        btnFold.disabled = true;
+        btnCall.innerText = "체크 / 콜 (불가)";
+        btnQuarter.innerText = "쿼터 (불가)";
+    } else {
+        if (currentRound === 1 && callCost === 0) {
+            btnCall.disabled = true;
+            btnCall.innerText = "체크 불가(1R)";
+        }
+        if (currentMaxBet === 0) {
+            btnCall.disabled = true; 
+            btnCall.innerText = "콜 (레이즈 없음)";
+            if (currentRound >= 2 && callCost === 0) {
+                btnCall.disabled = false;
+                btnCall.innerText = "체크 (0칩)";
+            }
+        }
+    }
+
+    if (p.chips < quarterCost) btnQuarter.disabled = true;
+    if (p.chips < halfCost) btnHalf.disabled = true;
+    if (p.chips < callCost) btnCall.disabled = true;
+}
+
+function executeAction(type) {
+    let p = gamePlayers[currentTurnIndex];
+    let callCost = currentMaxBet - p.betInThisRound;
+    
+    if (type === 'call') {
+        p.chips -= callCost;
+        pot += callCost;
+        p.betInThisRound = currentMaxBet;
+    } 
+    else if (type === 'quarter') {
+        let raiseAmt = Math.floor(pot / 4);
+        let totalCost = callCost + raiseAmt;
+        p.chips -= totalCost;
+        pot += totalCost;
+        currentMaxBet += raiseAmt;
+        p.betInThisRound = currentMaxBet;
+        lastRaiserIndex = currentTurnIndex;
+    } 
+    else if (type === 'half') {
+        let raiseAmt = Math.floor(pot / 2);
+        let totalCost = callCost + raiseAmt;
+        p.chips -= totalCost;
+        pot += totalCost;
+        currentMaxBet += raiseAmt;
+        p.betInThisRound = currentMaxBet;
+        lastRaiserIndex = currentTurnIndex;
+    } 
+    else if (type === 'fold') {
+        p.isFolded = true;
+    }
+
+    roundActionCount++;
+    currentTurnIndex = (currentTurnIndex + 1) % 4;
+    processTurn();
+}
+
+// 라운드가 종료되었을 때 호출되는 흐름 제어 함수 (요청 반영)
+function nextRoundFlow() {
+    // 4개의 기본 베팅 버튼 그리드를 가림
+    document.getElementById("normal-action-buttons").classList.add("hidden");
+    
+    // 다음 라운드 진행 대기 패널 및 버튼 노출
+    const nextPanel = document.getElementById("next-round-panel");
+    const nextBtn = document.getElementById("next-round-big-btn");
+    nextPanel.classList.remove("hidden");
+
+    if (currentRound < 3) {
+        document.getElementById("action-title").innerText = `📢 ${currentRound}라운드 베팅 종료`;
+        nextBtn.innerText = `${currentRound + 1}라운드 진행`;
+    } else {
+        document.getElementById("action-title").innerText = `📢 최종 라운드 베팅 종료`;
+        nextBtn.innerText = `쇼다운(결산) 진행`;
+    }
+}
+
+// 대기 버튼 클릭 시 실제 라운드 교체나 쇼다운 화면으로 전환을 처리하는 확정 함수
+function commitNextRoundFlow() {
+    if (currentRound < 3) {
+        startRound(currentRound + 1);
+    } else {
+        openShowdownWindow();
+    }
+}
+
+function updateGameUI() {
+    let rake = Math.floor(pot * RAKE_RATE);
+    let netPot = pot - rake;
+
+    document.getElementById("pot-display").innerText = pot.toLocaleString();
+    document.getElementById("net-pot-display").innerText = netPot.toLocaleString();
+    document.getElementById("rake-display").innerText = rake.toLocaleString();
+
+    const tContainer = document.getElementById("table-players-container");
+    tContainer.innerHTML = "";
+
+    gamePlayers.forEach((p, idx) => {
+        let isCurrent = (idx === currentTurnIndex && !p.isFolded);
+        let stateClass = "player-box";
+        if (p.isFolded) stateClass += " folded";
+        if (isCurrent) stateClass += " active";
+
+        tContainer.innerHTML += `
+            <div class="${stateClass}">
+                <div style="font-weight:800; font-size:15px; margin-bottom:6px; color:${isCurrent ? 'var(--neon-green)' : 'var(--text-color)'}">${p.name}</div>
+                <div style="font-size:13px; color:var(--text-light-muted);">보유: <span style="color:#f8fafc; font-weight:700;">${p.chips.toLocaleString()}</span>칩</div>
+                <div style="font-size:12px; color: var(--text-light-muted); margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.04); font-family:monospace;">이번R 베팅: ${p.betInThisRound.toLocaleString()}</div>
+            </div>
+        `;
+    });
+}
+
+function autoWinByFold() {
+    let winner = gamePlayers.find(p => !p.isFolded);
+    concludeGameWithWinner(winner);
+}
+
+function openShowdownWindow() {
+    document.getElementById("game-screen").classList.add("hidden");
+    document.getElementById("showdown-screen").classList.remove("hidden");
+
+    let rake = Math.floor(pot * RAKE_RATE);
+    let netPot = pot - rake;
+
+    document.getElementById("sd-net-pot").innerText = netPot.toLocaleString();
+    document.getElementById("sd-rake-pot").innerText = rake.toLocaleString();
+
+    const wContainer = document.getElementById("winner-buttons-container");
+    wContainer.innerHTML = "";
+
+    gamePlayers.forEach(p => {
+        if (p.isFolded) return;
+        let btn = document.createElement("button");
+        btn.className = "winner-btn";
+        btn.innerHTML = `🏆 <strong style="color:var(--text-color);">${p.name}</strong>을(를) 최종 승자로 선택`;
+        btn.onclick = () => concludeGameWithWinner(p);
+        wContainer.appendChild(btn);
+    });
+}
+
+function concludeGameWithWinner(winner) {
+    let rake = Math.floor(pot * RAKE_RATE);
+    let netPot = pot - rake;
+
+    winner.chips += netPot;
+
+    gamePlayers.forEach(gp => {
+        let coreIdx = allProfiles.findIndex(ap => ap.id === gp.id);
+        if (coreIdx > -1) {
+            allProfiles[coreIdx].chips = gp.chips;
+        }
+    });
+
+    saveToStorage();
+
+    document.getElementById("showdown-screen").classList.add("hidden");
+    document.getElementById("game-screen").classList.add("hidden");
+    document.getElementById("result-screen").classList.remove("hidden");
+
+    document.getElementById("result-summary-text").innerHTML = `
+        🎉 <strong style="color:var(--accent-color); font-size:24px; display:block; margin-bottom:14px; text-shadow: 0 0 10px rgba(251,191,36,0.2);">${winner.name} 승리!</strong>
+        수령 판돈: <span style="color:var(--neon-green); font-weight:900; font-size:24px; font-family:monospace;">+${netPot.toLocaleString()}칩</span><br>
+        <span style="font-size:13px; color:var(--text-light-muted); display:block; margin-top:10px;">(딜러 운영 수수료 5% 공제: ${rake.toLocaleString()}칩)</span>
+    `;
+}
+
+function actionNewGame() {
+    let first = gamePlayers.shift();
+    gamePlayers.push(first);
+
+    selectedIds = gamePlayers.map(p => p.id);
+    
+    gamePlayers = gamePlayers.map(gp => {
+        let core = allProfiles.find(p => p.id === gp.id);
+        return {
+            id: core.id,
+            name: core.name,
+            chips: core.chips,
+            betInThisRound: 0,
+            isFolded: false
+        };
+    });
+
+    document.getElementById("result-screen").classList.add("hidden");
+    document.getElementById("game-screen").classList.remove("hidden");
+    
+    setupHand();
+}
+
+function actionBackToLobby() {
+    selectedIds = [];
+    renderLobby();
+    document.getElementById("start-game-btn").disabled = true;
+
+    document.getElementById("result-screen").classList.add("hidden");
+    document.getElementById("game-screen").classList.add("hidden");
+    document.getElementById("showdown-screen").classList.add("hidden");
+    document.getElementById("lobby-screen").classList.remove("hidden");
+}
+
+// 7차 레이아웃: 토글 버튼이 삭제되었으므로 내부는 빈 함수로 우회 관리 (정합성 보존용)
+function toggleGenealogy() {}
+
+window.onload = initLoad;
+</script>
+
+</body>
+</html>
