@@ -599,7 +599,7 @@ function processTurn() {
     }
 
     let p = gamePlayers[currentTurnIndex];
-    document.getElementById("action-title").innerText = `▶ [${p.name}]님의 베팅 차례`;
+    document.getElementById("action-title").innerText = `▶ [${p.name}]님의 차례`;
 
     let callCost = currentMaxBet - p.betInThisRound;
     let quarterCost = (currentMaxBet - p.betInThisRound) + Math.floor(pot / 4);
@@ -616,30 +616,30 @@ function processTurn() {
     btnFold.disabled = false;
 
     if (callCost === 0) {
-        btnCall.innerText = `체크 (0칩)`;
+        btnCall.innerText = `체크(0칩)`;
     } else {
-        btnCall.innerText = `콜 (${callCost.toLocaleString()}칩)`;
+        btnCall.innerText = `콜(${callCost.toLocaleString()}칩)`;
     }
-    btnQuarter.innerText = `쿼터 (+${quarterCost.toLocaleString()}칩)`;
-    btnHalf.innerText = `하프 (+${halfCost.toLocaleString()}칩)`;
+    btnQuarter.innerText = `쿼터(+${quarterCost.toLocaleString()}칩)`;
+    btnHalf.innerText = `하프(+${halfCost.toLocaleString()}칩)`;
 
     if (currentRound === 1 && roundActionCount === 0 && currentTurnIndex === 0) {
         btnCall.disabled = true;
         btnQuarter.disabled = true;
         btnFold.disabled = true;
-        btnCall.innerText = "체크 / 콜 (불가)";
-        btnQuarter.innerText = "쿼터 (불가)";
+        btnCall.innerText = "체크 / 콜 [불가]";
+        btnQuarter.innerText = "쿼터 [불가]";
     } else {
         if (currentRound === 1 && callCost === 0) {
             btnCall.disabled = true;
-            btnCall.innerText = "체크 불가(1R)";
+            btnCall.innerText = "체크 불가[1R]";
         }
         if (currentMaxBet === 0) {
             btnCall.disabled = true; 
-            btnCall.innerText = "콜 (레이즈 없음)";
+            btnCall.innerText = "콜(레이즈 없음)";
             if (currentRound >= 2 && callCost === 0) {
                 btnCall.disabled = false;
-                btnCall.innerText = "체크 (0칩)";
+                btnCall.innerText = "체크(0칩)";
             }
         }
     }
